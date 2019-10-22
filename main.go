@@ -4,8 +4,14 @@ import (
 	"flag"
 	"fmt"
 	"github.com/OGFris/MP3ToVideo/mjpeg"
+	"github.com/anthonynsimon/bild/adjust"
+	"github.com/anthonynsimon/bild/blur"
+	"github.com/anthonynsimon/bild/imgio"
+	"github.com/anthonynsimon/bild/transform"
 	"github.com/dhowden/tag"
 	"github.com/tcolgate/mp3"
+	"image"
+	"io/ioutil"
 	"log"
 	"math/rand"
 	"os"
@@ -73,8 +79,46 @@ func main() {
 
 	}
 
+	imgF, err := os.Create(temp + ".jpeg")
+	if err != nil {
+		panic(err)
+	}
+
+	_, err = imgF.Write(m.Picture().Data)
+	if err != nil {
+		panic(err)
+	}
+
+	err = imgF.Close()
+	if err != nil {
+		panic(err)
+	}
+
+	img, err := imgio.Open(temp + ".jpeg")
+	if err != nil {
+		panic(err)
+	}
+
+	cropped := transform.Crop(img, image.Rect(0, 100, 1920, 800))
+	resized := transform.Resize(cropped, 1920, 1080, transform.Linear)
+	result := blur.Gaussian(resized, 50.0)
+	bright := adjust.Brightness(result, -0.7)
+
+	if err = imgio.Save(temp+"final.jpeg", bright, imgio.JPEGEncoder(100)); err != nil {
+		panic(err)
+	}
+
 	for i := 0; i < int(dur); i++ {
-		err = aw.AddFrame(m.Picture().Data)
+		imgf, err := os.Open(temp + "final.jpeg")
+		if err != nil {
+			panic(err)
+		}
+		imgBytes, err := ioutil.ReadAll(imgf)
+		if err != nil {
+			panic(err)
+		}
+
+		err = aw.AddFrame(imgBytes)
 		if err != nil {
 			panic(err)
 		}
